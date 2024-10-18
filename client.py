@@ -2,8 +2,7 @@ import socket
 import threading
 import pickle
 import time
-import random
-from gps3 import gps3  # Add this import
+import geocoder
 import socket as py_socket  # For getting the hostname
 
 SERVER_IP = '192.168.100.52'  # Replace with the leader's IP address
@@ -12,28 +11,23 @@ PORT = 65432
 class Client:
     def __init__(self):
         self.name = py_socket.gethostname()
-        self.location = self.get_initial_location()
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.connect_to_server()
 
         # Start sending location periodically
         threading.Thread(target=self.send_location_periodically, daemon=True).start()
 
-    def get_initial_location(self):
-        gps_socket = gps3.GPSDSocket()
-        data_stream = gps3.DataStream()
-        gps_socket.connect()
-        gps_socket.watch()
-        for new_data in gps_socket:
-            if new_data:
-                data_stream.unpack(new_data)
-                latitude = data_stream.TPV['lat']
-                longitude = data_stream.TPV['lon']
-                if latitude != 'n/a' and longitude != 'n/a':
-                    return (latitude, longitude)
-        # If GPS data is not available, return default or raise an error
-        print("GPS data not available.")
-        return (0.0, 0.0)
+    def get_location(self):
+        try:
+            g = geocoder.ip('me')
+            if g.ok:
+                return g.latlng  # Returns (latitude, longitude)
+            else:
+                print("[ERROR] Geocoder could not find location.")
+                return (0.0, 0.0)
+        except Exception as e:
+            print(f"[ERROR] {e}")
+            return (0.0, 0.0)
 
     def connect_to_server(self):
         while True:
@@ -48,21 +42,21 @@ class Client:
     def send_location_periodically(self):
         while True:
             try:
-                data = {'name': self.name, 'location': self.location}
+                location = self.get_location()
+                data = {'name': self.name, 'location': location}
                 data = pickle.dumps(data)
                 self.sock.sendall(data)
-                print(f"[SENT] Location sent: {self.location}")
+                print(f"[SENT] Location sent: {location}")
             except BrokenPipeError:
                 print("[DISCONNECTED] Lost connection to the leader. Reconnecting...")
                 self.sock.close()
                 self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 self.connect_to_server()
-            time.sleep(2)  # Send location every 2 seconds
-
-    # Remove the movement simulation loop if using actual GPS data
+            except Exception as e:
+                print(f"[ERROR] {e}")
+            time.sleep(10)  # Send location every 10 seconds
 
 if __name__ == "__main__":
     client = Client()
-    # No need for movement simulation if using real GPS data
     while True:
         time.sleep(5)
