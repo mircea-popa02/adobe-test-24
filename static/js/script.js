@@ -20,13 +20,16 @@ document.addEventListener('DOMContentLoaded', function () {
             map.removeLayer(markers[key]);
         }
         markers = {};
-
+    
         // Add new markers
         for (var addr in data) {
-            var loc = data[addr];
+            var clientData = data[addr];
+            var loc = clientData.location;
+            var name = clientData.name;
             var marker = L.marker([loc[0], loc[1]]).addTo(map);
-            marker.bindPopup(addr);
+            marker.bindPopup(name || addr);
             markers[addr] = marker;
         }
     });
+    
 });

@@ -43,9 +43,11 @@ def handle_client(conn, addr):
             if not data:
                 break
 
-            location = pickle.loads(data)
+            location_data = pickle.loads(data)
+            name = location_data['name']
+            location = location_data['location']
             with clients_lock:
-                clients[addr] = (conn, location)
+                clients[addr] = (conn, name, location)
                 # Send updated locations to web clients
                 socketio.emit('update_locations', get_locations())
     except (ConnectionResetError, EOFError):
@@ -61,7 +63,10 @@ def handle_client(conn, addr):
 
 def get_locations():
     with clients_lock:
-        return {str(addr): loc for addr, (_, loc) in clients.items()}
+        return {
+            str(addr): {'name': name, 'location': loc}
+            for addr, (_, name, loc) in clients.items()
+        }
 
 def start_server():
     print("[STARTING] Leader server is starting...")
