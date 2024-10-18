@@ -6,7 +6,7 @@ import geocoder
 from protocol import NetworkProtocol
 from datetime import datetime
 
-SERVER_IP = '192.168.100.52'  # Replace with your server's IP
+SERVER_IP = '192.168.100.52'
 PORT = 65432
 
 class Client:
