@@ -3,6 +3,7 @@
 import pickle
 import struct
 import socket
+import datetime
 
 class NetworkProtocol:
     """Simple protocol for sending/receiving Python objects over network"""
