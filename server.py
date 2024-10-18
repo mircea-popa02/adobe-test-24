@@ -39,7 +39,7 @@ def handle_client(conn, addr):
     try:
         print(f"[NEW CONNECTION] {addr} connected.")
         while True:
-            data = conn.recv(1024)
+            data = conn.recv(4096)
             if not data:
                 break
 
@@ -47,16 +47,15 @@ def handle_client(conn, addr):
             name = location_data['name']
             location = location_data['location']
             with clients_lock:
-                clients[addr] = (conn, name, location)
+                clients[addr] = {'conn': conn, 'name': name, 'location': location}
                 # Send updated locations to web clients
                 socketio.emit('update_locations', get_locations())
-    except (ConnectionResetError, EOFError):
-        print(f"[DISCONNECT] {addr} disconnected abruptly.")
+    except Exception as e:
+        print(f"[ERROR] {addr} disconnected abruptly: {e}")
     finally:
         with clients_lock:
             if addr in clients:
                 del clients[addr]
-                # Update web clients when a client disconnects
                 socketio.emit('update_locations', get_locations())
             conn.close()
             print(f"[DISCONNECT] {addr} disconnected.")
@@ -64,8 +63,8 @@ def handle_client(conn, addr):
 def get_locations():
     with clients_lock:
         return {
-            str(addr): {'name': name, 'location': loc}
-            for addr, (_, name, loc) in clients.items()
+            str(addr): {'name': client['name'], 'location': client['location']}
+            for addr, client in clients.items()
         }
 
 def start_server():
