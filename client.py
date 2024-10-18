@@ -4,7 +4,7 @@ import pickle
 import time
 import random
 
-SERVER_IP = '192.168.1.2'  # Replace with the leader's IP address
+SERVER_IP = '192.168.100.57'  # Replace with the leader's IP address
 PORT = 65432
 
 class Client:
