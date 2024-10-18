@@ -3,7 +3,7 @@
 import pickle
 import struct
 import socket
-import datetime
+from datetime import datetime  # Ensure this import is present
 
 class NetworkProtocol:
     """Simple protocol for sending/receiving Python objects over network"""
