@@ -45,7 +45,10 @@ class Client:
                 location = self.get_location()
                 data = {'name': self.name, 'location': location}
                 data = pickle.dumps(data)
-                self.sock.sendall(data)
+                data_length = len(data)
+                data_length_packed = data_length.to_bytes(4, byteorder='big')
+                # Send the length followed by the data
+                self.sock.sendall(data_length_packed + data)
                 print(f"[SENT] Location sent: {location}")
             except BrokenPipeError:
                 print("[DISCONNECTED] Lost connection to the leader. Reconnecting...")

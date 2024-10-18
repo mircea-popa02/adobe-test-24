@@ -19,6 +19,7 @@ document.addEventListener('DOMContentLoaded', function () {
         for (var key in markers) {
             map.removeLayer(markers[key]);
         }
+        console.log(data)
         markers = {};
     
         // Add new markers

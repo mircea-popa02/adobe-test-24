@@ -39,11 +39,21 @@ def handle_client(conn, addr):
     try:
         print(f"[NEW CONNECTION] {addr} connected.")
         while True:
-            data = conn.recv(4096)
-            if not data:
+            # Read the length of the incoming message (4 bytes)
+            raw_msglen = recvall(conn, 4)
+            if not raw_msglen:
+                print(f"[DISCONNECT] {addr} disconnected.")
                 break
-
+            # Unpack the length
+            msglen = int.from_bytes(raw_msglen, byteorder='big')
+            # Read the actual data
+            data = recvall(conn, msglen)
+            if not data:
+                print(f"[DISCONNECT] {addr} disconnected.")
+                break
+            # Deserialize the data
             location_data = pickle.loads(data)
+            print(f"[RECEIVED] Data from {addr}: {location_data}")
             name = location_data['name']
             location = location_data['location']
             with clients_lock:
@@ -58,7 +68,8 @@ def handle_client(conn, addr):
                 del clients[addr]
                 socketio.emit('update_locations', get_locations())
             conn.close()
-            print(f"[DISCONNECT] {addr} disconnected.")
+            print(f"[DISCONNECT] {addr} connection closed.")
+
 
 def get_locations():
     with clients_lock:
@@ -66,6 +77,17 @@ def get_locations():
             str(addr): {'name': client['name'], 'location': client['location']}
             for addr, client in clients.items()
         }
+        
+def recvall(conn, n):
+    """Helper function to receive n bytes or return None if EOF is hit"""
+    data = bytearray()
+    while len(data) < n:
+        packet = conn.recv(n - len(data))
+        if not packet:
+            return None
+        data.extend(packet)
+    return data
+
 
 def start_server():
     print("[STARTING] Leader server is starting...")
