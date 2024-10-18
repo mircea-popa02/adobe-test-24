@@ -1,77 +1,18 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>GPS Location Sharing</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
+    <title>Halloween Forest Map</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-        }
-        #map { 
-            height: 500px;
-            margin: 20px 0;
-            border-radius: 8px;
-            border: 2px solid #ccc;
-        }
-        #coordinates {
-            margin: 20px 0;
-            padding: 20px;
-            background: #e0f7fa;
-            border-radius: 8px;
-        }
-        h1, h3 {
-            color: #333;
-        }
-        p {
-            font-size: 16px;
-            color: #555;
-        }
-    </style>
+    <link rel="stylesheet" href="/static/css/style.css" />
 </head>
 <body>
-    <h1>GPS Location Sharing App</h1>
     <div id="map"></div>
-    <div id="coordinates">
-        <h3>Your Coordinates:</h3>
-        <p id="your-coordinates">Latitude: N/A, Longitude: N/A</p>
-        <h3>Other Device's Coordinates:</h3>
-        <p id="other-coordinates">Latitude: N/A, Longitude: N/A</p>
-    </div>
 
+    <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-    <script>
-        const socket = io();
-        const map = L.map('map').setView([0, 0], 2);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
-        const myMarker = L.marker([0, 0]).addTo(map);
-        const otherMarker = L.marker([0, 0], {icon: L.icon({iconUrl: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png'})}).addTo(map);
-
-        function updateLocation() {
-            navigator.geolocation.getCurrentPosition(position => {
-                const location = {
-                    latitude: position.coords.latitude,
-                    longitude: position.coords.longitude
-                };
-                // Update your own coordinates display
-                document.getElementById('your-coordinates').textContent = `Latitude: ${location.latitude}, Longitude: ${location.longitude}`;
-                myMarker.setLatLng([location.latitude, location.longitude]);  // Update marker position
-                map.setView([location.latitude, location.longitude], 13);   // Center the map and zoom in
-                socket.emit('send_location', location);  // Send the location to the server
-            }, error => {
-                console.error('Error getting location:', error);
-            });
-        }
-
-        socket.on('receive_other_location', function(location) {
-            const { latitude, longitude } = location;
-            // Update other device's coordinates display
-            document.getElementById('other-coordinates').textContent = `Latitude: ${latitude}, Longitude: ${longitude}`;
-            otherMarker.setLatLng([latitude, longitude]);  // Move the other marker
-        });
-
-        setInterval(updateLocation, 5000);  // Update location every 5 seconds
-    </script>
+    <!-- Socket.IO -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.4.1/socket.io.min.js"></script>
+    <!-- Custom JS -->
+    <script src="/static/js/script.js"></script>
 </body>
 </html>
