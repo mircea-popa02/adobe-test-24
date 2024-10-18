@@ -26,9 +26,11 @@ document.addEventListener('DOMContentLoaded', function () {
             var clientData = data[addr];
             var loc = clientData.location;
             var name = clientData.name;
-            var marker = L.marker([loc[0], loc[1]]).addTo(map);
-            marker.bindPopup(name || addr);
-            markers[addr] = marker;
+            if (loc[0] !== 0.0 && loc[1] !== 0.0) {
+                var marker = L.marker([loc[0], loc[1]]).addTo(map);
+                marker.bindPopup(name || addr);
+                markers[addr] = marker;
+            }
         }
     });
     
