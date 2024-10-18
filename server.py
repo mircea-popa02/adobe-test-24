@@ -1,5 +1,3 @@
-# server.py
-
 import eventlet
 eventlet.monkey_patch()  # Must be called before any other imports
 
@@ -33,6 +31,16 @@ def send_static(path):
 @app.route('/tiles/<path:filename>')
 def tiles(filename):
     return send_from_directory('tiles', filename)
+
+def recvall(conn, n):
+    """Helper function to receive n bytes or return None if EOF is hit"""
+    data = bytearray()
+    while len(data) < n:
+        packet = conn.recv(n - len(data))
+        if not packet:
+            return None
+        data.extend(packet)
+    return data
 
 def handle_client(conn, addr):
     global clients
@@ -70,24 +78,17 @@ def handle_client(conn, addr):
             conn.close()
             print(f"[DISCONNECT] {addr} connection closed.")
 
-
 def get_locations():
     with clients_lock:
-        return {
+        # Print received data for debugging
+        locations = {
             str(addr): {'name': client['name'], 'location': client['location']}
             for addr, client in clients.items()
         }
-        
-def recvall(conn, n):
-    """Helper function to receive n bytes or return None if EOF is hit"""
-    data = bytearray()
-    while len(data) < n:
-        packet = conn.recv(n - len(data))
-        if not packet:
-            return None
-        data.extend(packet)
-    return data
-
+        print("[DEBUG] Received data from clients:")
+        for addr, data in locations.items():
+            print(f"Client {addr} -> Name: {data['name']}, Location: {data['location']}")
+        return locations
 
 def start_server():
     print("[STARTING] Leader server is starting...")

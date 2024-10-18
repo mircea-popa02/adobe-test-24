@@ -21,7 +21,7 @@ class Client:
         try:
             g = geocoder.ip('me')
             if g.ok:
-                return g.latlng  # Returns (latitude, longitude)
+                return g.latlng  # Returns [latitude, longitude]
             else:
                 print("[ERROR] Geocoder could not find location.")
                 return (0.0, 0.0)
@@ -47,7 +47,6 @@ class Client:
                 data = pickle.dumps(data)
                 data_length = len(data)
                 data_length_packed = data_length.to_bytes(4, byteorder='big')
-                # Send the length followed by the data
                 self.sock.sendall(data_length_packed + data)
                 print(f"[SENT] Location sent: {location}")
             except BrokenPipeError:
