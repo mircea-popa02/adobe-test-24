@@ -3,35 +3,17 @@ import socket
 import threading
 import time
 import geocoder
-import struct
-import pickle
+from protocol import NetworkProtocol
+from datetime import datetime
 
 SERVER_IP = '192.168.100.52'  # Replace with your server's IP
 PORT = 65432
-
-def send_data(sock, data):
-    """Send data with detailed logging"""
-    try:
-        # Serialize the data
-        serialized = pickle.dumps(data)
-        print(f"[DEBUG] Serialized data length: {len(serialized)}")
-        
-        # Pack the length as a 4-byte integer
-        length = struct.pack('!I', len(serialized))
-        print(f"[DEBUG] Packed length: {length.hex()}")
-        
-        # Send length followed by data
-        sock.sendall(length + serialized)
-        print(f"[DEBUG] Sent {len(serialized) + 4} bytes total")
-        return True
-    except Exception as e:
-        print(f"[ERROR] Error sending data: {e}")
-        return False
 
 class Client:
     def __init__(self):
         self.name = socket.gethostname()
         self.running = True
+        self.sock = None
         self.connect_to_server()
 
     def connect_to_server(self):
@@ -40,27 +22,30 @@ class Client:
             try:
                 self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
-                print(f"[DEBUG] Attempting connection to {SERVER_IP}:{PORT}")
+                print(f"[{datetime.now()}] [DEBUG] Attempting connection to {SERVER_IP}:{PORT}")
                 self.sock.connect((SERVER_IP, PORT))
-                print("[CONNECTED] Connected to server.")
+                print(f"[{datetime.now()}] [CONNECTED] Connected to server.")
                 self.start_location_updates()
                 break
             except ConnectionRefusedError:
-                print("[RETRY] Server not available. Retrying in 5 seconds...")
+                print(f"[{datetime.now()}] [RETRY] Server not available. Retrying in 5 seconds...")
                 time.sleep(5)
             except Exception as e:
-                print(f"[ERROR] Connection failed: {e}")
+                print(f"[{datetime.now()}] [ERROR] Connection failed: {e}")
                 time.sleep(5)
 
     def get_location(self):
         """Get current location using geocoder"""
         try:
             g = geocoder.ip('me')
-            location = g.latlng if g.ok else (0.0, 0.0)
-            print(f"[DEBUG] Got location: {location}")
+            if g.ok and g.latlng:
+                location = g.latlng
+            else:
+                raise ValueError("Geocoder failed to get location.")
+            print(f"[{datetime.now()}] [DEBUG] Got location: {location}")
             return location
         except Exception as e:
-            print(f"[ERROR] Location error: {e}")
+            print(f"[{datetime.now()}] [ERROR] Location error: {e}")
             return (0.0, 0.0)
 
     def start_location_updates(self):
@@ -74,25 +59,28 @@ class Client:
                         'name': self.name,
                         'location': location
                     }
-                    print(f"[DEBUG] Preparing to send data: {data}")
-                    
-                    if send_data(self.sock, data):
-                        print(f"[SENT] Successfully sent location: {location}")
+                    print(f"[{datetime.now()}] [DEBUG] Preparing to send data: {data}")
+
+                    if NetworkProtocol.send_data(self.sock, data):
+                        print(f"[{datetime.now()}] [SENT] Successfully sent location: {location}")
                     else:
-                        print("[ERROR] Failed to send location")
-                        break
-                        
+                        print(f"[{datetime.now()}] [ERROR] Failed to send location")
+                        time.sleep(5)
+                        continue  # Retry without breaking the loop
+
                     time.sleep(10)  # Wait 10 seconds before next update
-                    
+
                 except Exception as e:
-                    print(f"[ERROR] Update failed: {e}")
-                    break
-                    
-            # If we break from the loop, try to reconnect
-            print("[DEBUG] Update loop ended, closing socket")
-            self.sock.close()
+                    print(f"[{datetime.now()}] [ERROR] Update failed: {e}")
+                    time.sleep(5)
+                    continue  # Continue the loop even after an error
+
+            # If we exit the loop, attempt to reconnect
+            print(f"[{datetime.now()}] [DEBUG] Update loop ended, closing socket")
+            if self.sock:
+                self.sock.close()
             if self.running:
-                print("[RECONNECTING] Lost connection to server...")
+                print(f"[{datetime.now()}] [RECONNECTING] Lost connection to server...")
                 self.connect_to_server()
 
         # Start update thread
@@ -102,10 +90,11 @@ class Client:
         """Stop the client gracefully"""
         self.running = False
         try:
-            self.sock.close()
+            if self.sock:
+                self.sock.close()
         except:
             pass
-        print("[DEBUG] Client stopped")
+        print(f"[{datetime.now()}] [DEBUG] Client stopped")
 
 if __name__ == "__main__":
     client = Client()
@@ -113,5 +102,5 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        print("\n[STOPPING] Client shutting down...")
+        print(f"\n[{datetime.now()}] [STOPPING] Client shutting down...")
         client.stop()
