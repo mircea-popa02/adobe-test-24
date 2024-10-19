@@ -1,0 +1,25 @@
+<!-- index.html -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Halloween Forest Party</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+</head>
+<body>
+  <div id="map"></div>
+  <button id="alert-btn">Alert Danger</button>
+  <div id="alert-panel"></div>
+  <!-- Alert Sound -->
+  <audio id="alert-sound" src="audio/alert.mp3" preload="auto"></audio>
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <!-- Socket.IO -->
+  <script src="/socket.io/socket.io.js"></script>
+  <!-- App JS -->
+  <script src="js/app.js"></script>
+</body>
+</html>
