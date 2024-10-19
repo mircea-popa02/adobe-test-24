@@ -6,7 +6,7 @@ import geocoder
 from protocol import NetworkProtocol
 from datetime import datetime
 
-SERVER_IP = '192.168.100.52'
+SERVER_IP = '192.168.100.52'  # Replace with your server's IP
 PORT = 65432
 
 class Client:
@@ -61,9 +61,6 @@ class Client:
                     }
                     print(f"[{datetime.now()}] [DEBUG] Preparing to send data: {data}")
 
-                    # Add this line to log the data being sent
-                    print(f"[{datetime.now()}] [DEBUG] Sending data to server: {data}")
-
                     if NetworkProtocol.send_data(self.sock, data):
                         print(f"[{datetime.now()}] [SENT] Successfully sent location: {location}")
                     else:
@@ -77,6 +74,17 @@ class Client:
                     print(f"[{datetime.now()}] [ERROR] Update failed: {e}")
                     time.sleep(5)
                     continue  # Continue the loop even after an error
+
+            # If we exit the loop, attempt to reconnect
+            print(f"[{datetime.now()}] [DEBUG] Update loop ended, closing socket")
+            if self.sock:
+                self.sock.close()
+            if self.running:
+                print(f"[{datetime.now()}] [RECONNECTING] Lost connection to server...")
+                self.connect_to_server()
+
+        # Start update thread
+        threading.Thread(target=update_loop, daemon=True).start()
 
     def stop(self):
         """Stop the client gracefully"""
