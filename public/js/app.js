@@ -131,7 +131,7 @@ const map = L.map("map").setView([44.4268, 26.1025], 13);
 
 // Add local tile layer
 L.tileLayer("/tiles/{z}/{x}/{y}.png", {
-  maxZoom: 19,
+  maxZoom: 16,
 }).addTo(map);
 
 // Layer groups for users, ghost markers, danger markers
@@ -241,6 +241,7 @@ map.on("click", (e) => {
 
     // Center map on new location
     map.setView([lat, lng], 15);
+    showCustomNotification("You have changed your location!")
 
     // Exit "set location" mode
     isSettingLocation = false;
@@ -326,9 +327,10 @@ function addGhostMarker(data) {
 
   // Add click event to delete the marker
   marker.on("click", () => {
+
     if (confirm("Do you want to delete this ghost marker?")) {
-      // Emit an event to delete the marker
       socket.emit("deleteMarker", { id: data.id });
+      showCustomNotification("You have removed a ghost!")
     }
   });
 }
@@ -376,12 +378,14 @@ function addDangerMarker(data) {
 
   // Add click event to show time elapsed and possibly delete
   marker.on("click", () => {
-    if (confirm("Do you want to delete this danger marker?")) {
+    if (confirm("Do you want to delete this danger alert?")) {
       // Emit an event to delete the danger marker
       socket.emit("deleteDangerMarker", { id: data.id });
+      showCustomNotification ("You have removed a danger alert!")
     }
   });
 
+  // TODO: add tooltip not just on creation 
   marker.bindTooltip(timeElapsed(data.timestamp), {
     permanent: false,
     direction: "top",
@@ -410,8 +414,10 @@ socket.on("dangerAlert", (data) => {
   alertMessage.className = "alert-message";
   alertMessage.setAttribute("title", timeElapsed(data.timestamp)); // Add this line
   alertMessage.innerHTML = `
-    ${data.message} at (${data.lat.toFixed(5)}, ${data.lng.toFixed(5)})
-    <span class="time-elapsed">${timeElapsed(data.timestamp)}</span>
+    <div class="alert-container">
+        ${data.message} at (${data.lat.toFixed(5)}, ${data.lng.toFixed(5)}) 
+        <span class="time-elapsed">${timeElapsed(data.timestamp)}</span>
+    </div>
     <button class="close-alert">Dismiss</button>
   `;
   alertPanel.appendChild(alertMessage);
@@ -426,7 +432,7 @@ socket.on("dangerAlert", (data) => {
     if (alertPanel.contains(alertMessage)) {
       alertPanel.removeChild(alertMessage);
     }
-  }, 10000);
+  }, 20000);
 
   // Add danger icon marker at the danger location
   addDangerMarker(data);
@@ -436,7 +442,7 @@ socket.on("dangerAlert", (data) => {
     color: "red",
     fillColor: "#f03",
     fillOpacity: 0.5,
-    radius: 50,
+    radius: 70,
   }).addTo(dangerLayer);
 
   // Flash the circle by changing its opacity
@@ -446,11 +452,11 @@ socket.on("dangerAlert", (data) => {
     dangerCircle.setStyle({ fillOpacity: opacity });
   }, 500);
 
-  // Stop flashing after 5 seconds
+
   setTimeout(() => {
     clearInterval(flashInterval);
     dangerLayer.removeLayer(dangerCircle);
-  }, 5000);
+  }, 20000);
 });
 
 // Handle removing danger markers
@@ -477,7 +483,7 @@ document.getElementById("alert-btn").addEventListener("click", () => {
 
   if (currentPosition) {
     const { latitude, longitude } = currentPosition.coords;
-    const dangerMessage = "Danger reported!";
+    const dangerMessage = "Danger reported by " + userName + "! ";
     socket.emit("dangerAlert", {
       message: dangerMessage,
       lat: latitude,
@@ -493,7 +499,7 @@ document.getElementById("alert-btn").addEventListener("click", () => {
   canSendAlert = false;
   setTimeout(() => {
     canSendAlert = true;
-  }, 10000); // 10-second cooldown
+  }, 20000);
 });
 
 // --------------------
@@ -527,45 +533,12 @@ socket.on("chatMessage", (data) => {
   chatMessages.scrollTop = chatMessages.scrollHeight;
 });
 
-// Function to show custom update location modal
-function showUpdateLocationModal() {
-  const modal = document.getElementById("update-location-modal");
-  if (modal) {
-    modal.style.display = "block";
-  }
-}
-
-// Function to hide custom update location modal
-function hideUpdateLocationModal() {
-  const modal = document.getElementById("update-location-modal");
-  if (modal) {
-    modal.style.display = "none";
-  }
-}
 
 // Add event listener to the update location button
 document.getElementById("update-location-btn").addEventListener("click", () => {
   isSettingLocation = true;
-  showUpdateLocationModal();
 });
 
-// Handle modal close
-const modalClose = document.getElementById("modal-close");
-if (modalClose) {
-  modalClose.onclick = function () {
-    hideUpdateLocationModal();
-    isSettingLocation = false; // Exit "set location" mode if modal is closed without updating
-  };
-}
-
-// Close the modal when clicking outside of it
-window.onclick = function (event) {
-  const modal = document.getElementById("update-location-modal");
-  if (event.target == modal) {
-    modal.style.display = "none";
-    isSettingLocation = false; // Exit "set location" mode if modal is closed without updating
-  }
-};
 
 // Function to prompt user for manual location input
 function promptForLocation() {
@@ -602,11 +575,13 @@ function promptForLocation() {
 function showCustomNotification(message) {
   const alertPanel = document.getElementById("alert-panel");
   const notification = document.createElement("div");
-  notification.className = "alert-message";
+  notification.className = "alert-message-neutral";
   notification.setAttribute("title", timeElapsed(Date.now())); // Current time as elapsed time
   notification.innerHTML = `
+    <div class="alert-container">
       ${message}
-      <button class="close-alert">Dismiss</button>
+    </div>
+    <button class="close-alert">Dismiss</button>
     `;
   alertPanel.appendChild(notification);
 
