@@ -16,6 +16,9 @@ app.use('/tiles', express.static(path.join(__dirname, 'tiles')));
 let ghostMarkers = [];
 let dangerMarkers = [];
 
+// Array to store chat messages
+let chatMessages = []; // New line
+
 // Variables to assign unique IDs to markers
 let nextGhostMarkerId = 1;
 let nextDangerMarkerId = 1;
@@ -32,6 +35,9 @@ io.on('connection', (socket) => {
 
   // Send existing users to the new client
   socket.emit('existingUsers', users);
+
+  // Send existing chat messages to the new client
+  socket.emit('existingChatMessages', chatMessages); // New line
 
   // Handle receiving location data
   socket.on('sendLocation', (data) => {
@@ -86,8 +92,21 @@ io.on('connection', (socket) => {
 
   // Handle chat messages
   socket.on('chatMessage', (data) => {
+    // Store the message
+    const chatMessage = {
+      name: data.name,
+      message: data.message,
+      timestamp: Date.now(),
+    };
+    chatMessages.push(chatMessage); // New line
+
+    // Optionally, limit chatMessages array size to prevent memory issues
+    if (chatMessages.length > 1000) {
+      chatMessages.shift();
+    }
+
     // Broadcast the chat message to all clients
-    io.emit('chatMessage', data);
+    io.emit('chatMessage', chatMessage);
   });
 
   // Handle user disconnection
