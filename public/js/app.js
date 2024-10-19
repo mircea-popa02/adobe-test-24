@@ -2,22 +2,29 @@
 
 // Connect to the Socket.io server
 const socket = io();
-
+let userName;
 // --------------------
 // Helper Functions
 // --------------------
 
 // Function to initialize the user's name
-function initializeUserName() {
-  let userName = localStorage.getItem("userName");
+async function initializeUserName() {
+  userName = localStorage.getItem("userName");
   if (!userName) {
     // Prompt the user for their name
-    userName = prompt("Enter your name:") || "Anonymous";
+    const inputName = await customPrompt("Enter your name:");
+    userName =
+      inputName && inputName.trim() !== "" ? inputName.trim() : "Anonymous";
     // Save the name to localStorage
     localStorage.setItem("userName", userName);
   }
   return userName;
 }
+
+initializeUserName().then((name) => {
+  userName = name;
+  initializeLocation();
+});
 
 // Function to get location via IP-based geolocation
 function getLocationByIP() {
@@ -58,7 +65,7 @@ function getLocationByIP() {
 }
 
 // Function to prompt user for manual location input
-function promptForLocation() {
+async function promptForLocation() {
   const lat = parseFloat(prompt("Enter your latitude:"));
   const lng = parseFloat(prompt("Enter your longitude:"));
   if (!isNaN(lat) && !isNaN(lng)) {
@@ -83,7 +90,7 @@ function promptForLocation() {
     // Center map on new location
     map.setView([lat, lng], 15);
   } else {
-    alert("Invalid coordinates.");
+        await customAlert("Invalid coordinates.");
   }
 }
 
@@ -115,12 +122,6 @@ function timeElapsed(timestamp) {
     return `${diffSeconds} second(s) ago`;
   }
 }
-
-// --------------------
-// Initialize User Name
-// --------------------
-
-const userName = initializeUserName();
 
 // --------------------
 // Initialize the Map
@@ -241,7 +242,7 @@ map.on("click", (e) => {
 
     // Center map on new location
     map.setView([lat, lng], 15);
-    showCustomNotification("You have changed your location!")
+    showCustomNotification("You have changed your location!");
 
     // Exit "set location" mode
     isSettingLocation = false;
@@ -326,11 +327,13 @@ function addGhostMarker(data) {
   ghostMarkers[data.id] = marker;
 
   // Add click event to delete the marker
-  marker.on("click", () => {
-
-    if (confirm("Do you want to delete this ghost marker?")) {
+  marker.on("click", async () => {
+    const userConfirmed = await customConfirm(
+      "Do you want to delete this ghost marker?"
+    );
+    if (userConfirmed) {
       socket.emit("deleteMarker", { id: data.id });
-      showCustomNotification("You have removed a ghost!")
+      showCustomNotification("You have removed a ghost!");
     }
   });
 }
@@ -362,6 +365,7 @@ socket.on("removeMarker", (data) => {
 // --------------------
 
 // Function to add a danger marker to the map
+// Function to add a danger marker to the map
 function addDangerMarker(data) {
   const dangerIcon = L.icon({
     iconUrl: "images/danger.png", // Ensure you have this image in 'public/images/'
@@ -377,20 +381,54 @@ function addDangerMarker(data) {
   dangerMarkers[data.id] = marker;
 
   // Add click event to show time elapsed and possibly delete
-  marker.on("click", () => {
-    if (confirm("Do you want to delete this danger alert?")) {
-      // Emit an event to delete the danger marker
+  marker.on("click", async () => {
+    const userConfirmed = await customConfirm(
+      "Do you want to delete this danger alert?"
+    );
+    if (userConfirmed) {
       socket.emit("deleteDangerMarker", { id: data.id });
-      showCustomNotification ("You have removed a danger alert!")
+      showCustomNotification("You have removed a danger alert!");
     }
   });
 
-  // TODO: add tooltip not just on creation 
-  marker.bindTooltip(timeElapsed(data.timestamp), {
+  // Bind a tooltip without content initially
+  marker.bindTooltip("", {
     permanent: false,
     direction: "top",
     offset: [0, -10],
   });
+
+  // Update tooltip content on mouseover
+  marker.on("mouseover", () => {
+    const elapsedTime = timeElapsed(data.timestamp);
+    marker.setTooltipContent(elapsedTime);
+    marker.openTooltip();
+  });
+
+  // Optionally, close the tooltip on mouseout
+  marker.on("mouseout", () => {
+    marker.closeTooltip();
+  });
+
+  // Add a pulsing circle at the danger location
+  const dangerCircle = L.circle([data.lat, data.lng], {
+    color: "red",
+    fillColor: "#f03",
+    fillOpacity: 0.5,
+    radius: 70,
+  }).addTo(dangerLayer);
+
+  // Flash the circle by changing its opacity
+  let opacity = 0.5;
+  const flashInterval = setInterval(() => {
+    opacity = opacity === 0.5 ? 0 : 0.5;
+    dangerCircle.setStyle({ fillOpacity: opacity });
+  }, 500);
+
+  setTimeout(() => {
+    clearInterval(flashInterval);
+    dangerLayer.removeLayer(dangerCircle);
+  }, 20000);
 }
 
 // Handle receiving existing danger markers
@@ -416,7 +454,7 @@ socket.on("dangerAlert", (data) => {
   alertMessage.innerHTML = `
     <div class="alert-container">
         ${data.message} at (${data.lat.toFixed(5)}, ${data.lng.toFixed(5)}) 
-        <span class="time-elapsed">${timeElapsed(data.timestamp)}</span>
+        <span class="time-elapsed">Just now</span>
     </div>
     <button class="close-alert">Dismiss</button>
   `;
@@ -452,7 +490,6 @@ socket.on("dangerAlert", (data) => {
     dangerCircle.setStyle({ fillOpacity: opacity });
   }, 500);
 
-
   setTimeout(() => {
     clearInterval(flashInterval);
     dangerLayer.removeLayer(dangerCircle);
@@ -475,15 +512,15 @@ socket.on("removeDangerMarker", (data) => {
 // Add event listener to the alert button
 let canSendAlert = true;
 
-document.getElementById("alert-btn").addEventListener("click", () => {
+document.getElementById("alert-btn").addEventListener("click", async () => {
   if (!canSendAlert) {
-    alert("Please wait before sending another alert.");
+    await customAlert("Please wait before sending another alert.");
     return;
   }
 
   if (currentPosition) {
     const { latitude, longitude } = currentPosition.coords;
-    const dangerMessage = "Danger reported by " + userName + "! ";
+    const dangerMessage = "Danger reported by " + userName;
     socket.emit("dangerAlert", {
       message: dangerMessage,
       lat: latitude,
@@ -492,7 +529,7 @@ document.getElementById("alert-btn").addEventListener("click", () => {
       timestamp: Date.now(),
     });
   } else {
-    alert("Unable to determine your location.");
+    await customAlert("Unable to determine your location.");
     return;
   }
 
@@ -533,17 +570,19 @@ socket.on("chatMessage", (data) => {
   chatMessages.scrollTop = chatMessages.scrollHeight;
 });
 
-
 // Add event listener to the update location button
 document.getElementById("update-location-btn").addEventListener("click", () => {
   isSettingLocation = true;
 });
 
-
 // Function to prompt user for manual location input
-function promptForLocation() {
-  const lat = parseFloat(prompt("Enter your latitude:"));
-  const lng = parseFloat(prompt("Enter your longitude:"));
+async function promptForLocation() {
+  const latInput = await customPrompt("Enter your latitude:");
+  const lngInput = await customPrompt("Enter your longitude:");
+
+  const lat = parseFloat(latInput);
+  const lng = parseFloat(lngInput);
+
   if (!isNaN(lat) && !isNaN(lng)) {
     currentPosition = {
       coords: {
@@ -566,7 +605,6 @@ function promptForLocation() {
     // Center map on new location
     map.setView([lat, lng], 15);
   } else {
-    // Use a custom alert instead of the default browser alert
     showCustomNotification("Invalid coordinates. Please try again.");
   }
 }
@@ -614,4 +652,118 @@ function appendChatMessage(data) {
   chatMessages.appendChild(messageElement);
   // Scroll to the bottom
   chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function customConfirm(message) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById("custom-confirm-modal");
+    const confirmMessage = document.getElementById("confirm-message");
+    const btnYes = document.getElementById("confirm-yes");
+    const btnNo = document.getElementById("confirm-no");
+
+    confirmMessage.textContent = message;
+
+    modal.style.display = "block";
+    btnYes.focus(); // Set initial focus
+
+    // Handler for Yes button
+    const onYes = () => {
+      cleanup();
+      resolve(true);
+    };
+
+    // Handler for No button
+    const onNo = () => {
+      cleanup();
+      resolve(false);
+    };
+
+    // Cleanup function to remove event listeners and hide modal
+    const cleanup = () => {
+      btnYes.removeEventListener("click", onYes);
+      btnNo.removeEventListener("click", onNo);
+      modal.style.display = "none";
+    };
+
+    btnYes.addEventListener("click", onYes);
+    btnNo.addEventListener("click", onNo);
+  });
+}
+
+function customPrompt(message) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById("custom-prompt-modal");
+    const promptMessage = document.getElementById("prompt-message");
+    const promptInput = document.getElementById("prompt-input");
+    const btnSubmit = document.getElementById("prompt-submit");
+    const btnCancel = document.getElementById("prompt-cancel");
+
+    promptMessage.textContent = message;
+    promptInput.value = ""; // Clear any existing input
+
+    modal.style.display = "block";
+    promptInput.focus(); // Set initial focus
+
+    // Handler for Submit button
+    const onSubmit = () => {
+      const value = promptInput.value.trim();
+      cleanup();
+      resolve(value);
+    };
+
+    // Handler for Cancel button
+    const onCancel = () => {
+      cleanup();
+      resolve(null);
+    };
+
+    // Cleanup function to remove event listeners and hide modal
+    const cleanup = () => {
+      btnSubmit.removeEventListener("click", onSubmit);
+      btnCancel.removeEventListener("click", onCancel);
+      modal.style.display = "none";
+    };
+
+    btnSubmit.addEventListener("click", onSubmit);
+    btnCancel.addEventListener("click", onCancel);
+
+    // Optional: Allow pressing Enter to submit
+    promptInput.addEventListener("keyup", function (event) {
+      if (event.key === "Enter") {
+        onSubmit();
+      }
+    });
+  });
+}
+
+function customAlert(message) {
+  return new Promise((resolve) => {
+    const modal = document.createElement("div");
+    modal.classList.add("modal");
+    modal.innerHTML = `
+        <div class="modal-content">
+          <p>${message}</p>
+          <div class="modal-buttons">
+            <button id="alert-ok" class="modal-button">OK</button>
+          </div>
+        </div>
+      `;
+    document.body.appendChild(modal);
+    const btnOk = modal.querySelector("#alert-ok");
+
+    modal.style.display = "block";
+    btnOk.focus();
+
+    const onOk = () => {
+      cleanup();
+      resolve();
+    };
+
+    const cleanup = () => {
+      btnOk.removeEventListener("click", onOk);
+      document.body.removeChild(modal);
+    };
+
+    btnOk.addEventListener("click", onOk);
+  });
 }

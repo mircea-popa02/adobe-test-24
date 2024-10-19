@@ -14,7 +14,7 @@
     <!-- Control Buttons -->
     <div class="button-group">
       <button id="alert-btn">Send Danger Alert</button>
-      <button id="update-location-btn">Update Location</button>
+      <button id="update-location-btn">Change Location</button>
     </div>
 
     <!-- Alert Panel -->
@@ -23,6 +23,29 @@
 
     <!-- Map Container -->
     <div id="map"></div>
+
+    <!-- Custom Confirm Modal -->
+    <div id="custom-confirm-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="confirm-message">
+      <div class="modal-content">
+        <p id="confirm-message">Are you sure?</p>
+        <div class="modal-buttons">
+          <button id="confirm-yes" class="modal-button">Yes</button>
+          <button id="confirm-no" class="modal-button">No</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Custom Prompt Modal -->
+    <div id="custom-prompt-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="prompt-message">
+      <div class="modal-content">
+        <p id="prompt-message">Please enter a value:</p>
+        <input type="text" id="prompt-input" class="modal-input" aria-label="Input" />
+        <div class="modal-buttons">
+          <button id="prompt-submit" class="modal-button">Submit</button>
+          <button id="prompt-cancel" class="modal-button">Cancel</button>
+        </div>
+      </div>
+    </div>
 
     <!-- Chat Interface -->
     <div id="chat-container">
