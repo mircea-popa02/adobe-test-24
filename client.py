@@ -49,42 +49,34 @@ class Client:
             return (0.0, 0.0)
 
     def start_location_updates(self):
-        """Start sending location updates in a separate thread"""
-        def update_loop():
-            while self.running:
-                try:
-                    # Get and send location
-                    location = self.get_location()
-                    data = {
-                        'name': self.name,
-                        'location': location
-                    }
-                    print(f"[{datetime.now()}] [DEBUG] Preparing to send data: {data}")
+    """Start sending location updates in a separate thread"""
+    def update_loop():
+        while self.running:
+            try:
+                # Get and send location
+                location = self.get_location()
+                data = {
+                    'name': self.name,
+                    'location': location
+                }
+                print(f"[{datetime.now()}] [DEBUG] Preparing to send data: {data}")
 
-                    if NetworkProtocol.send_data(self.sock, data):
-                        print(f"[{datetime.now()}] [SENT] Successfully sent location: {location}")
-                    else:
-                        print(f"[{datetime.now()}] [ERROR] Failed to send location")
-                        time.sleep(5)
-                        continue  # Retry without breaking the loop
+                # Add this line to log the data being sent
+                print(f"[{datetime.now()}] [DEBUG] Sending data to server: {data}")
 
-                    time.sleep(10)  # Wait 10 seconds before next update
-
-                except Exception as e:
-                    print(f"[{datetime.now()}] [ERROR] Update failed: {e}")
+                if NetworkProtocol.send_data(self.sock, data):
+                    print(f"[{datetime.now()}] [SENT] Successfully sent location: {location}")
+                else:
+                    print(f"[{datetime.now()}] [ERROR] Failed to send location")
                     time.sleep(5)
-                    continue  # Continue the loop even after an error
+                    continue  # Retry without breaking the loop
 
-            # If we exit the loop, attempt to reconnect
-            print(f"[{datetime.now()}] [DEBUG] Update loop ended, closing socket")
-            if self.sock:
-                self.sock.close()
-            if self.running:
-                print(f"[{datetime.now()}] [RECONNECTING] Lost connection to server...")
-                self.connect_to_server()
+                time.sleep(10)  # Wait 10 seconds before next update
 
-        # Start update thread
-        threading.Thread(target=update_loop, daemon=True).start()
+            except Exception as e:
+                print(f"[{datetime.now()}] [ERROR] Update failed: {e}")
+                time.sleep(5)
+                continue  # Continue the loop even after an error
 
     def stop(self):
         """Stop the client gracefully"""

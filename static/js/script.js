@@ -15,11 +15,13 @@ document.addEventListener('DOMContentLoaded', function () {
     var socket = io();
 
     socket.on('update_locations', function (data) {
+        // Log the raw data received
+        console.log("[DEBUG] Data received from server:", data);
+    
         // Remove existing markers
         for (var key in markers) {
             map.removeLayer(markers[key]);
         }
-        console.log(data)
         markers = {};
     
         // Add new markers
@@ -27,12 +29,20 @@ document.addEventListener('DOMContentLoaded', function () {
             var clientData = data[addr];
             var loc = clientData.location;
             var name = clientData.name;
+    
+            // Log each client's data
+            console.log("[DEBUG] Processing client:", addr, "Name:", name, "Location:", loc);
+    
             if (loc[0] !== 0.0 && loc[1] !== 0.0) {
                 var marker = L.marker([loc[0], loc[1]]).addTo(map);
                 marker.bindPopup(name || addr);
                 markers[addr] = marker;
+                console.log("[DEBUG] Added marker for:", name);
+            } else {
+                console.log("[DEBUG] Invalid location for client:", name, "Skipping marker.");
             }
         }
     });
+    
     
 });

@@ -48,6 +48,9 @@ def handle_client(conn, addr):
 
             print(f"[{datetime.now()}] [RECEIVED] Data from {addr}: {data}")
 
+            # Add this line to log the received data in detail
+            print(f"[{datetime.now()}] [DEBUG] Data received from client {addr}: {data}")
+
             # Update client information
             with clients_lock:
                 try:
@@ -86,7 +89,7 @@ def get_locations():
             }
             for addr, client in clients.items()
         }
-        print(f"[{datetime.now()}] [DEBUG] Current locations: {locations}")
+        print(f"[{datetime.now()}] [DEBUG] Current locations being sent to web clients: {locations}")
         return locations
 
 def start_server():
