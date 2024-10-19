@@ -3,6 +3,7 @@
 // Connect to the Socket.io server
 const socket = io();
 let userName;
+
 // --------------------
 // Helper Functions
 // --------------------
@@ -66,8 +67,12 @@ function getLocationByIP() {
 
 // Function to prompt user for manual location input
 async function promptForLocation() {
-  const lat = parseFloat(prompt("Enter your latitude:"));
-  const lng = parseFloat(prompt("Enter your longitude:"));
+  const latInput = await customPrompt("Enter your latitude:");
+  const lngInput = await customPrompt("Enter your longitude:");
+
+  const lat = parseFloat(latInput);
+  const lng = parseFloat(lngInput);
+
   if (!isNaN(lat) && !isNaN(lng)) {
     currentPosition = {
       coords: {
@@ -90,7 +95,8 @@ async function promptForLocation() {
     // Center map on new location
     map.setView([lat, lng], 15);
   } else {
-        await customAlert("Invalid coordinates.");
+    await customAlert("Invalid coordinates.");
+    showCustomNotification("Invalid coordinates. Please try again.");
   }
 }
 
@@ -135,15 +141,17 @@ L.tileLayer("/tiles/{z}/{x}/{y}.png", {
   maxZoom: 16,
 }).addTo(map);
 
-// Layer groups for users, ghost markers, danger markers
+// Layer groups for users, ghost markers, danger markers, and user journeys
 const usersLayer = L.layerGroup().addTo(map);
 const markersLayer = L.layerGroup().addTo(map);
 const dangerLayer = L.layerGroup().addTo(map);
+const journeysLayer = L.layerGroup().addTo(map); // New layer for user journeys
 
-// Objects to store markers
+// Objects to store markers and user journeys
 const userMarkers = {};
 const ghostMarkers = {};
 const dangerMarkers = {};
+const userJourneys = {}; // New object to store user journeys
 
 // Variable to store the user's current position
 let currentPosition = null;
@@ -248,7 +256,13 @@ map.on("click", (e) => {
     isSettingLocation = false;
   } else {
     // Handle placing ghost markers
-    const markerData = { lat: e.latlng.lat, lng: e.latlng.lng };
+    const markerData = {
+      id: generateUniqueId(),
+      lat: e.latlng.lat,
+      lng: e.latlng.lng,
+      name: userName,
+      timestamp: Date.now(),
+    };
     socket.emit("placeMarker", markerData);
   }
 });
@@ -258,9 +272,12 @@ map.on("click", (e) => {
 // --------------------
 
 // Add event listener to the update location button
-document.getElementById("update-location-btn").addEventListener("click", () => {
-  isSettingLocation = true;
-});
+document
+  .getElementById("update-location-btn")
+  .addEventListener("click", () => {
+    isSettingLocation = true;
+    showCustomNotification("Click on the map to set your new location.");
+  });
 
 // --------------------
 // User Marker Management
@@ -284,6 +301,21 @@ function addOrUpdateUserMarker(data) {
       offset: [0, -10],
     });
     userMarkers[id] = marker;
+
+    // Initialize journey for the user
+    if (!userJourneys[id]) {
+      userJourneys[id] = {
+        polyline: L.polyline([], { color: getRandomColor() }).addTo(journeysLayer),
+        path: [],
+      };
+    }
+  }
+
+  // Add the new location to the user's journey
+  if (userJourneys[id]) {
+    const newLatLng = [lat, lng];
+    userJourneys[id].path.push(newLatLng);
+    userJourneys[id].polyline.setLatLngs(userJourneys[id].path);
   }
 }
 
@@ -306,11 +338,21 @@ socket.on("userDisconnected", (id) => {
     usersLayer.removeLayer(userMarkers[id]);
     delete userMarkers[id];
   }
+  // Remove user journey
+  if (userJourneys[id]) {
+    journeysLayer.removeLayer(userJourneys[id].polyline);
+    delete userJourneys[id];
+  }
 });
 
 // --------------------
 // Ghost Marker Management
 // --------------------
+
+// Function to generate a unique ID for ghost markers
+function generateUniqueId() {
+  return 'ghost-' + Math.random().toString(36).substr(2, 9);
+}
 
 // Function to add a ghost marker to the map
 function addGhostMarker(data) {
@@ -319,12 +361,47 @@ function addGhostMarker(data) {
     iconSize: [32, 32],
     iconAnchor: [16, 32],
   });
+
   const marker = L.marker([data.lat, data.lng], { icon: ghostIcon }).addTo(
     markersLayer
   );
 
   // Store the marker with its ID
   ghostMarkers[data.id] = marker;
+
+  // Store the data object within the marker for easy access
+  marker.options.data = data;
+
+  // Bind a tooltip to show the ghost's name
+  marker.bindTooltip(data.name, {
+    permanent: false,
+    direction: "top",
+    offset: [0, -10],
+  });
+
+  // Create and bind the "Last Seen" tooltip
+  const lastSeenTooltip = L.tooltip({
+    direction: "bottom",
+    offset: [0, 10],
+    opacity: 0.8,
+  }).setContent(`Last seen: ${timeElapsed(data.timestamp)}`);
+
+  marker.bindTooltip(lastSeenTooltip, {
+    permanent: false,
+    interactive: false,
+  });
+
+  // Update the "Last Seen" tooltip on mouseover
+  marker.on("mouseover", () => {
+    const elapsedTime = timeElapsed(data.timestamp);
+    lastSeenTooltip.setContent(`Last seen: ${elapsedTime}`);
+    marker.openTooltip(lastSeenTooltip);
+  });
+
+  // Close the tooltip on mouseout
+  marker.on("mouseout", () => {
+    marker.closeTooltip(lastSeenTooltip);
+  });
 
   // Add click event to delete the marker
   marker.on("click", async () => {
@@ -349,6 +426,7 @@ socket.on("existingMarkers", (markers) => {
 // Handle receiving new ghost markers
 socket.on("newMarker", (data) => {
   addGhostMarker(data);
+  showCustomNotification("A new ghost was discovered!");
 });
 
 // Handle removing ghost markers
@@ -364,7 +442,6 @@ socket.on("removeMarker", (data) => {
 // Danger Alert Management
 // --------------------
 
-// Function to add a danger marker to the map
 // Function to add a danger marker to the map
 function addDangerMarker(data) {
   const dangerIcon = L.icon({
@@ -401,7 +478,7 @@ function addDangerMarker(data) {
   // Update tooltip content on mouseover
   marker.on("mouseover", () => {
     const elapsedTime = timeElapsed(data.timestamp);
-    marker.setTooltipContent(elapsedTime);
+    marker.getTooltip().setContent(`Last seen: ${elapsedTime}`);
     marker.openTooltip();
   });
 
@@ -465,7 +542,7 @@ socket.on("dangerAlert", (data) => {
     alertPanel.removeChild(alertMessage);
   });
 
-  // Optionally, remove the alert message after 10 seconds if not dismissed
+  // Optionally, remove the alert message after 20 seconds if not dismissed
   setTimeout(() => {
     if (alertPanel.contains(alertMessage)) {
       alertPanel.removeChild(alertMessage);
@@ -474,26 +551,6 @@ socket.on("dangerAlert", (data) => {
 
   // Add danger icon marker at the danger location
   addDangerMarker(data);
-
-  // Create a pulsing circle at the danger location
-  const dangerCircle = L.circle([data.lat, data.lng], {
-    color: "red",
-    fillColor: "#f03",
-    fillOpacity: 0.5,
-    radius: 70,
-  }).addTo(dangerLayer);
-
-  // Flash the circle by changing its opacity
-  let opacity = 0.5;
-  const flashInterval = setInterval(() => {
-    opacity = opacity === 0.5 ? 0 : 0.5;
-    dangerCircle.setStyle({ fillOpacity: opacity });
-  }, 500);
-
-  setTimeout(() => {
-    clearInterval(flashInterval);
-    dangerLayer.removeLayer(dangerCircle);
-  }, 20000);
 });
 
 // Handle removing danger markers
@@ -561,83 +618,11 @@ chatForm.addEventListener("submit", (e) => {
 
 // Receive chat messages
 socket.on("chatMessage", (data) => {
-  const { name, message } = data;
-  const messageElement = document.createElement("div");
-  messageElement.classList.add("message");
-  messageElement.innerHTML = `<strong>${name}:</strong> ${message}`;
-  chatMessages.appendChild(messageElement);
-  // Scroll to the bottom
-  chatMessages.scrollTop = chatMessages.scrollHeight;
+  appendChatMessage(data);
 });
 
-// Add event listener to the update location button
-document.getElementById("update-location-btn").addEventListener("click", () => {
-  isSettingLocation = true;
-});
-
-// Function to prompt user for manual location input
-async function promptForLocation() {
-  const latInput = await customPrompt("Enter your latitude:");
-  const lngInput = await customPrompt("Enter your longitude:");
-
-  const lat = parseFloat(latInput);
-  const lng = parseFloat(lngInput);
-
-  if (!isNaN(lat) && !isNaN(lng)) {
-    currentPosition = {
-      coords: {
-        latitude: lat,
-        longitude: lng,
-      },
-    };
-    // Save location to localStorage
-    localStorage.setItem(
-      "userLocation",
-      JSON.stringify({ latitude: lat, longitude: lng })
-    );
-    // Emit location to server
-    socket.emit("sendLocation", {
-      id: socket.id,
-      lat: lat,
-      lng: lng,
-      name: userName,
-    });
-    // Center map on new location
-    map.setView([lat, lng], 15);
-  } else {
-    showCustomNotification("Invalid coordinates. Please try again.");
-  }
-}
-
-// Function to show custom notifications
-function showCustomNotification(message) {
-  const alertPanel = document.getElementById("alert-panel");
-  const notification = document.createElement("div");
-  notification.className = "alert-message-neutral";
-  notification.setAttribute("title", timeElapsed(Date.now())); // Current time as elapsed time
-  notification.innerHTML = `
-    <div class="alert-container">
-      ${message}
-    </div>
-    <button class="close-alert">Dismiss</button>
-    `;
-  alertPanel.appendChild(notification);
-
-  // Add event listener to the dismiss button
-  notification.querySelector(".close-alert").addEventListener("click", () => {
-    alertPanel.removeChild(notification);
-  });
-
-  // Optionally, remove the notification after 5 seconds if not dismissed
-  setTimeout(() => {
-    if (alertPanel.contains(notification)) {
-      alertPanel.removeChild(notification);
-    }
-  }, 5000);
-}
-
+// Receive existing chat messages
 socket.on("existingChatMessages", (messages) => {
-  // New listener
   messages.forEach((data) => {
     appendChatMessage(data);
   });
@@ -654,6 +639,11 @@ function appendChatMessage(data) {
   chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
+// --------------------
+// Custom Modal Functions
+// --------------------
+
+// Custom Confirm Modal
 function customConfirm(message) {
   return new Promise((resolve) => {
     const modal = document.getElementById("custom-confirm-modal");
@@ -690,6 +680,7 @@ function customConfirm(message) {
   });
 }
 
+// Custom Prompt Modal
 function customPrompt(message) {
   return new Promise((resolve) => {
     const modal = document.getElementById("custom-prompt-modal");
@@ -727,7 +718,7 @@ function customPrompt(message) {
     btnSubmit.addEventListener("click", onSubmit);
     btnCancel.addEventListener("click", onCancel);
 
-    // Optional: Allow pressing Enter to submit
+    // Allow pressing Enter to submit
     promptInput.addEventListener("keyup", function (event) {
       if (event.key === "Enter") {
         onSubmit();
@@ -736,6 +727,7 @@ function customPrompt(message) {
   });
 }
 
+// Custom Alert Modal
 function customAlert(message) {
   return new Promise((resolve) => {
     const modal = document.createElement("div");
@@ -767,3 +759,147 @@ function customAlert(message) {
     btnOk.addEventListener("click", onOk);
   });
 }
+
+// --------------------
+// Notification Functionality
+// --------------------
+
+// Function to show custom notifications
+function showCustomNotification(message) {
+  const alertPanel = document.getElementById("alert-panel");
+  const notification = document.createElement("div");
+  notification.className = "alert-message-neutral";
+  notification.setAttribute("title", timeElapsed(Date.now())); // Current time as elapsed time
+  notification.innerHTML = `
+    <div class="alert-container">
+      ${message}
+    </div>
+    <button class="close-alert">Dismiss</button>
+    `;
+  alertPanel.appendChild(notification);
+
+  // Add event listener to the dismiss button
+  notification.querySelector(".close-alert").addEventListener("click", () => {
+    alertPanel.removeChild(notification);
+  });
+
+  // Optionally, remove the notification after 5 seconds if not dismissed
+  setTimeout(() => {
+    if (alertPanel.contains(notification)) {
+      alertPanel.removeChild(notification);
+    }
+  }, 3000);
+}
+
+// --------------------
+// Periodic Updates (Optional)
+// --------------------
+
+// Function to periodically update all "Last Seen" tooltips
+function updateAllLastSeenTooltips() {
+  // Update ghost markers
+  Object.values(ghostMarkers).forEach((marker) => {
+    const data = marker.options.data;
+    if (data && data.timestamp) {
+      const elapsedTime = timeElapsed(data.timestamp);
+      marker.getTooltip().setContent(`Last seen: ${elapsedTime}`);
+    }
+  });
+
+  // Update danger markers
+  Object.values(dangerMarkers).forEach((marker) => {
+    const data = marker.options.data;
+    if (data && data.timestamp) {
+      const elapsedTime = timeElapsed(data.timestamp);
+      marker.getTooltip().setContent(`Last seen: ${elapsedTime}`);
+    }
+  });
+
+  // Update user journeys tooltips if any
+  // (Optional: Implement if you have tooltips for journeys)
+}
+
+// Set an interval to update tooltips every minute
+setInterval(updateAllLastSeenTooltips, 60000); // 60000 ms = 1 minute
+
+// --------------------
+// Accessibility and Cleanup
+// --------------------
+
+// Close modals when clicking outside of them
+window.onclick = function (event) {
+  const confirmModal = document.getElementById("custom-confirm-modal");
+  const promptModal = document.getElementById("custom-prompt-modal");
+
+  if (event.target === confirmModal) {
+    confirmModal.style.display = "none";
+  }
+
+  if (event.target === promptModal) {
+    promptModal.style.display = "none";
+  }
+};
+
+// --------------------
+// User Journey Management
+// --------------------
+
+// Function to generate a random color for user journeys
+function getRandomColor() {
+  const letters = '0123456789ABCDEF';
+  let color = '#';
+  for (let i = 0; i < 6; i++) {
+    color += letters[Math.floor(Math.random() * 16)];
+  }
+  return color;
+}
+
+// Function to initialize existing user journeys
+function initializeUserJourneys(usersData) {
+  Object.values(usersData).forEach((data) => {
+    if (!userJourneys[data.id]) {
+      userJourneys[data.id] = {
+        polyline: L.polyline([], { color: getRandomColor() }).addTo(journeysLayer),
+        path: [],
+      };
+    }
+    const newLatLng = [data.lat, data.lng];
+    userJourneys[data.id].path.push(newLatLng);
+    userJourneys[data.id].polyline.setLatLngs(userJourneys[data.id].path);
+  });
+}
+
+// Modify existingUsers handler to initialize journeys
+socket.on("existingUsers", (usersData) => {
+  // Clear existing user markers and journeys
+  usersLayer.clearLayers();
+  journeysLayer.clearLayers();
+  Object.keys(userMarkers).forEach((id) => {
+    delete userMarkers[id];
+  });
+  Object.keys(userJourneys).forEach((id) => {
+    delete userJourneys[id];
+  });
+
+  // Add user markers and initialize their journeys
+  Object.values(usersData).forEach((data) => {
+    addOrUpdateUserMarker(data);
+  });
+});
+
+// Handle receiving location updates to update journeys
+socket.on("updateLocation", (data) => {
+  addOrUpdateUserMarker(data);
+});
+
+// Function to handle user disconnection and remove their journey
+socket.on("userDisconnected", (id) => {
+  if (userMarkers[id]) {
+    usersLayer.removeLayer(userMarkers[id]);
+    delete userMarkers[id];
+  }
+  if (userJourneys[id]) {
+    journeysLayer.removeLayer(userJourneys[id].polyline);
+    delete userJourneys[id];
+  }
+});
