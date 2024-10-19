@@ -1,3 +1,5 @@
+// server.js
+
 const express = require('express');
 const app = express();
 const http = require('http').createServer(app);
@@ -10,7 +12,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Serve map tiles from the 'tiles' directory
 app.use('/tiles', express.static(path.join(__dirname, 'tiles')));
 
-// Arrays to store all ghost and danger markers
+// Arrays to store ghost and danger markers
 let ghostMarkers = [];
 let dangerMarkers = [];
 
@@ -66,6 +68,8 @@ io.on('connection', (socket) => {
   socket.on('dangerAlert', (data) => {
     // Assign an ID to the danger marker
     data.id = nextDangerMarkerId++;
+    // Add a timestamp
+    data.timestamp = Date.now(); // milliseconds since epoch
     // Store the danger marker
     dangerMarkers.push(data);
     // Broadcast the danger alert to all clients (including sender)
@@ -80,6 +84,13 @@ io.on('connection', (socket) => {
     io.emit('removeDangerMarker', data);
   });
 
+  // Handle chat messages
+  socket.on('chatMessage', (data) => {
+    // Broadcast the chat message to all clients
+    io.emit('chatMessage', data);
+  });
+
+  // Handle user disconnection
   socket.on('disconnect', () => {
     console.log('A user disconnected:', socket.id);
     // Remove the user from the users object
@@ -89,8 +100,27 @@ io.on('connection', (socket) => {
   });
 });
 
+// Function to remove expired danger markers
+function removeExpiredDangerMarkers() {
+  const currentTime = Date.now();
+  const expirationTime = 5 * 60 * 1000; // 5 minutes in milliseconds
+  // Filter out expired markers
+  dangerMarkers = dangerMarkers.filter((marker) => {
+    if (currentTime - marker.timestamp < expirationTime) {
+      return true; // Keep the marker
+    } else {
+      // Inform clients to remove the expired marker
+      io.emit('removeDangerMarker', { id: marker.id });
+      return false; // Remove the marker
+    }
+  });
+}
+
+// Set an interval to periodically remove expired danger markers
+setInterval(removeExpiredDangerMarkers, 60 * 1000); // Check every minute
+
 // Start the server
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 http.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });

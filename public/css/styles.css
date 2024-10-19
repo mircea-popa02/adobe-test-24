@@ -1,5 +1,9 @@
 /* styles.css */
 
+* {
+  font-family: Arial, Helvetica, sans-serif;
+}
+
 body, html {
   margin: 0;
   padding: 0;
@@ -27,7 +31,7 @@ body, html {
   color: rgb(237, 237, 237);
   border: none;
   margin-bottom: 8px;
-  border-radius: 8px;
+  border-radius: 4px;
   cursor: pointer;
   transition: 0.3s;
 }
@@ -38,7 +42,7 @@ body, html {
   background-color: rgb(84, 84, 84);
   color: rgb(237, 237, 237);
   border: none;
-  border-radius: 8px;
+  border-radius: 4px;
   cursor: pointer;
   transition: 0.3s;
 }
@@ -53,26 +57,141 @@ body, html {
   transition: 0.3s;
 }
 
-#alert-panel {
-  position: absolute;
-  bottom: 10px;
-  left: 10px;
-  max-width: 300px;
-  z-index: 1000;
-  background-color: rgba(0, 0, 0, 0.7);
-  padding: 10px;
-  color: white;
-  border-radius: 5px;
-}
-
 .alert-message {
   margin-bottom: 5px;
 }
 
-.close-alert {
-  background: transparent;
+body, html {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+#map {
+  height: 100%;
+  width: 100%;
+}
+
+/* Control Buttons */
+.control-buttons {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 1000;
+}
+
+.control-buttons button {
+  display: block;
+  margin-bottom: 5px;
+  padding: 10px;
+  background-color: #007bff;
   color: white;
   border: none;
   cursor: pointer;
-  float: right;
+  border-radius: 4px;
+}
+
+.control-buttons button:hover {
+  background-color: #0056b3;
+}
+
+/* Alert Panel */
+#alert-panel {
+  /* position: fixed; */
+  background-color: rgba(255, 255, 255, 0.9);
+  border: 1px solid #ccc;
+  overflow-y: auto;
+  z-index: 1000;
+  border-radius: 4px;
+}
+
+.alert-message {
+  background-color: #f8d7da;
+  color: #721c24;
+  /* padding: 10px; */
+  /* margin-bottom: 10px; */
+  border: 1px solid #f5c6cb;
+  border-radius: 4px;
+  position: relative;
+}
+
+.alert-message .close-alert {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  background: none;
+  border: none;
+  font-weight: bold;
+  cursor: pointer;
+  color: #721c24;
+}
+
+.alert-message .time-elapsed {
+  display: block;
+  font-size: 0.8em;
+  color: #555;
+  margin-top: 5px;
+}
+
+/* Chat Container */
+#chat-container {
+  position: fixed;
+  bottom: 10px;
+  right: 10px;
+  width: 300px !important;
+  max-height: 40vh;
+  background-color: rgba(255, 255, 255, 0.9);
+  border: 1px solid #ccc;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border-radius: 4px;
+  z-index: 1000;
+}
+
+#chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 5px;
+}
+
+#chat-messages .message {
+  margin-bottom: 5px;
+}
+
+#chat-form {
+  display: flex;
+
+}
+
+input {
+  outline: none !important;
+  border: none !important;
+}
+
+#chat-input {
+  flex: 1;
+  border: none;
+  padding: 10px;
+  font-size: 1em;
+  width: 30vw;
+}
+
+#chat-form button {
+  border: none;
+  background-color: #28a745;
+  color: white;
+  padding: 10px;
+  cursor: pointer;
+  font-size: 1em;
+  transition: .3s
+}
+
+#chat-form button:hover {
+  background-color: #218838;
+  transition: 0.3s;
+}
+
+#alert-sound {
+  display: none;
 }
